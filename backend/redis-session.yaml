@@ -1,0 +1,30 @@
+version: "1"
+name: "Redis Basics"
+steps:
+  - name: "Set a simple key-value pair"
+    command: "SET"
+    key: "greeting"
+    value: "Hello, Redis!"
+    description: "This command sets a simple string value in Redis."
+
+  - name: "Retrieve the value"
+    command: "GET"
+    key: "greeting"
+    description: "This command retrieves the value we just set."
+
+  - name: "Set an expiring key"
+    command: "SETEX"
+    key: "short_lived"
+    value: "I will expire in 60 seconds"
+    expiry: 60
+    description: "This command sets a key with an expiration time."
+
+  - name: "Check if a key exists"
+    command: "EXISTS"
+    key: "greeting"
+    description: "This command checks if a key exists in Redis."
+
+  - name: "Delete a key"
+    command: "DEL"
+    key: "greeting"
+    description: "This command deletes a key from Redis."
