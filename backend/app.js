@@ -17,6 +17,27 @@ async function loadSessionConfig() {
   return yaml.load(file);
 }
 
+async function executeRedisCommand(container, command, ...args) {
+  const exec = await container.exec({
+      Cmd: ['redis-cli', command, ...args],
+      AttachStdout: true,
+      AttachStderr: true
+  });
+  
+  const stream = await exec.start();
+  return new Promise((resolve, reject) => {
+      let output = '';
+      stream.on('data', (chunk) => {
+          output += chunk.toString();
+      });
+      stream.on('end', () => {
+          resolve(output.trim());
+      });
+      stream.on('error', reject);
+  });
+}
+
+
 app.post("/start-session", async (req, res) => {
   try {
     const sessionId = Math.random().toString(36).substring(7);
@@ -32,14 +53,13 @@ app.post("/start-session", async (req, res) => {
         PortBindings: {
           "6379/tcp": [{ HostPort: "0" }],
         },
-        Memory: 80 * 1024 * 1024, // 80MB in bytes
-        MemorySwap: 80 * 1024 * 1024, // Set the swap limit to the same as memory limit
+        Memory: 80 * 1024 * 1024, 
+        MemorySwap: 80 * 1024 * 1024, 
       },
     });
 
     await container.start();
 
-    // Wait a moment for Redis to be ready
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const containerInfo = await container.inspect();
@@ -73,6 +93,7 @@ app.post("/start-session", async (req, res) => {
     res.status(500).json({ error: "Failed to start session" });
   }
 });
+
 app.post("/execute-command/:sessionId", async (req, res) => {
   const { sessionId } = req.params;
   const { command, args } = req.body;
@@ -89,32 +110,21 @@ app.post("/execute-command/:sessionId", async (req, res) => {
   try {
     const { client, container } = session;
 
-    // Check if the container is running, if not, start it
     const containerInfo = await container.inspect();
     if (!containerInfo.State.Running) {
       await container.start();
-      // Wait a moment for Redis to be ready
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    // Check if the client is connected, if not, reconnect
     if (!client.isOpen) {
       await client.connect();
     }
+    const result = await executeRedisCommand(container, command, ...args)
 
-    // Check if the command exists
-    if (typeof client[command.toLowerCase()] !== 'function') {
-      return res.status(400).json({ error: `Invalid Redis command: ${command}` });
-    }
-
-    // Execute the command with the provided arguments
-    const result = await client[command.toLowerCase()](...args);
-
-    res.json({ result });
+    res.json({ result: result });
   } catch (error) {
     console.error(`Error executing command ${command}:`, error);
 
-    // Return the actual Redis error
     return res.status(400).json({ 
       error: error.message,
       command: command,
