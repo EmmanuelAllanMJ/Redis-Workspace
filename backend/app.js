@@ -32,6 +32,8 @@ app.post("/start-session", async (req, res) => {
         PortBindings: {
           "6379/tcp": [{ HostPort: "0" }],
         },
+        Memory: 80 * 1024 * 1024, // 80MB in bytes
+        MemorySwap: 80 * 1024 * 1024, // Set the swap limit to the same as memory limit
       },
     });
 
